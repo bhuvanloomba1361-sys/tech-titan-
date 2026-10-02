@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Tech Titan</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<style>
+  :root{
+    --bg:#02040a; --panel:#0a0f1e; --panel-2:#0e1526;
+    --blue:#3d7fff; --amber:#ffb020; --mint:#5eead4;
+    --ink:#eef2ff; --slate:#7783a1; --line:rgba(120,150,255,0.16);
+    --mono:'JetBrains Mono', monospace; --bad:#ff5d5d;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;min-height:100vh;}
+  h1,h2,h3{font-family:'Space Grotesk',sans-serif;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:'Inter';background:var(--bg);border:1px solid var(--line);color:var(--ink);padding:9px 11px;font-size:13.5px;width:100%;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);}
+  label{display:block;font-family:var(--mono);font-size:10.5px;color:var(--slate);letter-spacing:0.03em;margin-bottom:5px;}
+  .field{margin-bottom:12px;}
+  ::selection{background:var(--blue);color:#fff;}
+  a{color:inherit;}
+
+  /* ---- login ---- */
+  #loginScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .login-box{width:100%;max-width:380px;border:1px solid var(--line);background:var(--panel);padding:32px;}
+  .login-brand{display:flex;align-items:center;gap:12px;margin-bottom:22px;}
+  .login-brand img{height:34px;width:auto;background:#fff;padding:3px;flex-shrink:0;}
+  .login-brand .tt-logo{height:38px;width:38px;object-fit:contain;background:none;padding:0;}
+  .login-brand-text b{display:block;font-family:'Space Grotesk';font-weight:700;font-size:1.05rem;}
+  .login-brand-text span{display:block;font-family:var(--mono);font-size:10.5px;color:var(--slate);letter-spacing:.04em;}
+  .login-box h1{font-size:1.25rem;margin-bottom:6px;}
+  .login-box p{color:var(--slate);font-size:12.5px;margin-bottom:22px;line-height:1.6;}
+  .login-error{color:var(--bad);font-family:var(--mono);font-size:11.5px;margin-top:10px;min-height:1em;}
+  .btn{background:var(--blue);color:#fff;padding:11px 18px;font-weight:600;font-size:13.5px;border:1px solid var(--blue);width:100%;}
+  .btn:disabled{opacity:0.5;cursor:not-allowed;}
+  .btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--line);padding:8px 14px;font-size:12.5px;}
+  .btn-ghost:hover{border-color:var(--mint);color:var(--mint);}
+  .btn-danger{background:transparent;color:var(--bad);border:1px solid var(--bad);padding:7px 12px;font-size:11.5px;}
+  .btn-sm{padding:8px 12px;font-size:12px;width:auto;}
+
+  /* ---- shell ---- */
+  #shell{display:none;}
+  .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:rgba(2,4,10,0.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap;}
+  .topbar-brand{display:flex;align-items:center;gap:10px;min-width:0;}
+  .topbar-brand img{height:26px;width:auto;flex-shrink:0;}
+  .topbar-brand .cgc-mark{background:#fff;padding:2px;}
+  .topbar-brand-text{display:flex;flex-direction:column;line-height:1.25;min-width:0;}
+  .topbar-brand-text b{font-family:'Space Grotesk';font-weight:700;font-size:.95rem;white-space:nowrap;}
+  .topbar-brand-text span{font-family:var(--mono);font-size:10px;color:var(--slate);white-space:nowrap;}
+  .topbar-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .whoami{font-family:var(--mono);font-size:10.5px;color:var(--slate);padding:6px 10px;border:1px solid var(--line);white-space:nowrap;}
+  .whoami b{color:var(--mint);}
+
+  .tabs{display:flex;gap:6px;padding:14px 24px 0;flex-wrap:wrap;}
+  .tab{font-family:var(--mono);font-size:11.5px;letter-spacing:0.03em;padding:9px 16px;border:1px solid var(--line);background:var(--panel);color:var(--slate);}
+  .tab.active{color:var(--mint);border-color:var(--mint);}
+  .panel{display:none;padding:24px;max-width:900px;}
+  .panel.active{display:block;}
+  .panel h2{font-size:1.2rem;margin-bottom:4px;}
+  .panel .hint{color:var(--slate);font-size:12px;margin-bottom:20px;font-family:var(--mono);line-height:1.6;}
+  .item-card{border:1px solid var(--line);background:var(--panel);padding:18px;margin-bottom:14px;position:relative;}
+  .item-card .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .item-card .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+  .item-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+  .item-top span{font-family:var(--mono);font-size:10.5px;color:var(--slate);}
+  .check-row{display:flex;align-items:center;gap:8px;margin-top:4px;}
+  .check-row input{width:auto;}
+  .save-bar{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:14px 0;margin-top:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .save-status{font-family:var(--mono);font-size:11.5px;color:var(--mint);min-height:1em;}
+  .dept-block{border:1px solid var(--line);background:var(--panel);margin-bottom:16px;}
+  .dept-block-head{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap;}
+  .dept-block-head input{max-width:280px;font-weight:600;}
+  .dept-block-body{padding:16px 18px;}
+  .student-row{border:1px solid var(--line);padding:14px;margin-bottom:10px;background:var(--panel-2);}
+
+  .no-access{border:1px dashed var(--line);padding:40px 24px;text-align:center;color:var(--slate);font-family:var(--mono);font-size:12.5px;line-height:1.8;}
+
+  /* ---- permissions ---- */
+  .perm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:14px 0 18px;}
+  .perm-check{display:flex;align-items:center;gap:9px;border:1px solid var(--line);background:var(--panel-2);padding:10px 12px;font-size:12.5px;}
+  .perm-check input{width:auto;flex-shrink:0;}
+  .perm-check.locked{opacity:0.55;}
+
+  /* ---- admin cards ---- */
+  .admin-card{border:1px solid var(--line);background:var(--panel);padding:18px;margin-bottom:14px;}
+  .admin-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
+  .admin-card-top b{font-size:14px;word-break:break-all;}
+  .role-badge{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;padding:3px 9px;border:1px solid var(--amber);color:var(--amber);white-space:nowrap;height:fit-content;}
+  .role-badge.sub{border-color:var(--mint);color:var(--mint);}
+  .admin-card-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+
+  /* ---- modal (change password) ---- */
+  .mini-overlay{position:fixed;inset:0;background:rgba(2,4,10,0.78);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px;z-index:80;}
+  .mini-overlay.open{display:flex;}
+  .mini-modal{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line);padding:26px;}
+  .mini-modal h3{font-size:1.1rem;margin-bottom:16px;}
+  .mini-close{position:absolute;top:14px;right:14px;}
+
+  .reg-card{border:1px solid var(--line);background:var(--panel);padding:16px 18px;margin-bottom:10px;}
+  .reg-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+  .reg-top b{font-size:14px;}
+  .reg-event{font-family:var(--mono);font-size:10.5px;color:var(--mint);letter-spacing:.04em;}
+  .reg-meta{font-family:var(--mono);font-size:11.5px;color:var(--slate);margin-top:8px;line-height:1.9;}
+  .reg-meta b{color:var(--ink);}
+  .reg-filter{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;align-items:center;}
+  .reg-filter select{width:auto;min-width:200px;}
+  .reg-count{font-family:var(--mono);font-size:11.5px;color:var(--slate);}
+
+  @media(max-width:640px){
+    .item-card .row2, .item-card .row3{grid-template-columns:1fr;}
+    .perm-grid{grid-template-columns:1fr;}
+    .panel{padding:18px 16px;}
+    .topbar{padding:10px 14px;}
+    .tabs{padding:12px 14px 0;}
+    .dept-block-head input{max-width:none;width:100%;}
+    .login-box{padding:24px 20px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-brand">
+      <img src="logo.png" alt="CGC Landran logo">
+      <img class="tt-logo" src="tech-titan-logo.png" alt="Tech Titan logo">
+      <div class="login-brand-text"><b>TECH TITAN</b><span>CGC LANDRAN</span></div>
+    </div>
+    <h1>Admin sign in</h1>
+    <p>Main admins and any admin accounts created from the "Manage admins" tab can sign in here.</p>
+    <div class="field"><label for="loginEmail">Email</label><input id="loginEmail" type="email" placeholder="admin@yourclub.com"></div>
+    <div class="field"><label for="loginPass">Password</label><input id="loginPass" type="password" placeholder="••••••••"></div>
+    <button class="btn" onclick="doLogin()">Sign in</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="shell">
+  <div class="topbar">
+    <div class="topbar-brand">
+      <img class="cgc-mark" src="logo.png" alt="CGC Landran logo">
+      <img src="tech-titan-logo.png" alt="Tech Titan logo" style="height:30px;">
+      <div class="topbar-brand-text"><b>TECH TITAN</b><span>CGC LANDRAN · ADMIN</span></div>
+    </div>
+    <div class="topbar-actions">
+      <div class="whoami" id="whoami"></div>
+      <button class="btn-ghost" onclick="openPwModal()">Change password</button>
+      <button class="btn-ghost" onclick="doLogout()">Log out</button>
+    </div>
+  </div>
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="stats" data-perm="stats">Stats</button>
+    <button class="tab" data-tab="leadership" data-perm="leadership">Leadership</button>
+    <button class="tab" data-tab="events" data-perm="events">Events</button>
+    <button class="tab" data-tab="campus" data-perm="campus">Campus</button>
+    <button class="tab" data-tab="moments" data-perm="moments">Moments</button>
+    <button class="tab" data-tab="departments" data-perm="departments">Departments</button>
+    <button class="tab" data-tab="registrations" data-perm="registrations">Registrations</button>
+    <button class="tab" data-tab="admins" data-perm="admins">Manage admins</button>
+  </div>
+
+  <div id="seedBanner" style="display:none;background:var(--panel-2);border:1px solid var(--amber);padding:16px 24px;margin:16px 24px 0;font-family:var(--mono);font-size:12.5px;color:var(--amber);">
+    No site content saved yet — the homepage is currently showing its built-in fallback text only in each visitor's browser, not from the database.
+    <br><button class="btn-ghost" style="margin-top:10px;" onclick="seedInitialContent()">Initialize content with starter data</button>
+  </div>
+
+  <div id="noAccessBanner" class="no-access" style="display:none;margin:24px;">
+    Your account doesn't have any dashboard sections enabled yet.<br>Ask the main admin to grant you access from "Manage admins".
+  </div>
+
+  <div class="panel active" id="panel-stats">
+    <h2>Homepage stats</h2>
+    <div class="hint">These are the four counters at the top of the homepage.</div>
+    <div class="item-card row2" style="display:grid;">
+      <div class="field"><label>Members</label><input id="s-members" type="number" min="0"></div>
+      <div class="field"><label>Events done</label><input id="s-eventsDone" type="number" min="0"></div>
+      <div class="field"><label>Upcoming</label><input id="s-upcoming" type="number" min="0"></div>
+      <div class="field"><label>Ongoing</label><input id="s-ongoing" type="number" min="0"></div>
+    </div>
+    <div class="save-bar"><button class="btn btn-sm" onclick="saveStats()">Save stats</button><span class="save-status" id="status-stats"></span></div>
+  </div>
+
+  <div class="panel" id="panel-leadership">
+    <h2>Leadership</h2>
+    <div class="hint">HOD, Director, Club Head — shown as the leadership grid.</div>
+    <div id="leadershipList"></div>
+    <button class="btn-ghost" onclick="addItem('leadership')">+ Add person</button>
+    <div class="save-bar"><button class="btn btn-sm" onclick="saveList('leadership')">Save leadership</button><span class="save-status" id="status-leadership"></span></div>
+  </div>
+
+  <div class="panel" id="panel-events">
+    <h2>Events</h2>
+    <div class="hint">Status controls the badge shown; "Open for registration" adds a Register button.</div>
+    <div id="eventsList"></div>
+    <button class="btn-ghost" onclick="addItem('events')">+ Add event</button>
+    <div class="save-bar"><button class="btn btn-sm" onclick="saveList('events')">Save events</button><span class="save-status" id="status-events"></span></div>
+  </div>
+
+  <div class="panel" id="panel-campus">
+    <h2>Campus gallery</h2>
+    <div class="hint">Photo can be a full image URL, or a filename already uploaded next to index.html (e.g. campus1.jpg).</div>
+    <div id="campusList"></div>
+    <button class="btn-ghost" onclick="addItem('campus')">+ Add photo</button>
+    <div class="save-bar"><button class="btn btn-sm" onclick="saveList('campus')">Save campus gallery</button><span class="save-status" id="status-campus"></span></div>
+  </div>
+
+  <div class="panel" id="panel-moments">
+    <h2>Student moments</h2>
+    <div id="momentsList"></div>
+    <button class="btn-ghost" onclick="addItem('moments')">+ Add moment</button>
+    <div class="save-bar"><button class="btn btn-sm" onclick="saveList('moments')">Save moments</button><span class="save-status" id="status-moments"></span></div>
+  </div>
+
+  <div class="panel" id="panel-departments">
+    <h2>Departments &amp; members</h2>
+    <div class="hint">Each department is saved as its own record the moment you click its Save button.</div>
+    <div id="deptList"></div>
+    <button class="btn-ghost" onclick="addDept()">+ Add department</button>
+  </div>
+
+  <div class="panel" id="panel-registrations">
+    <h2>Event registrations</h2>
+    <div class="hint">Everyone who has submitted the registration form on the main website, newest first.</div>
+    <div class="reg-filter">
+      <select id="regEventFilter" onchange="renderRegistrations()">
+        <option value="">All events</option>
+      </select>
+      <span class="reg-count" id="regCount"></span>
+    </div>
+    <div id="registrationsList"></div>
+  </div>
+
+  <div class="panel" id="panel-admins">
+    <h2>Manage admins</h2>
+    <div class="hint">Create sub-admin accounts and choose exactly which sections of this dashboard each one can use. Sub-admins can only see and edit the sections you switch on below.</div>
+
+    <div class="item-card">
+      <div class="item-top"><span>NEW SUB-ADMIN</span></div>
+      <div class="field"><label>Email</label><input id="na-email" type="email" placeholder="teammate@example.com"></div>
+      <div class="row2">
+        <div class="field"><label>Password</label><input id="na-pass" type="password" placeholder="min. 6 characters"></div>
+        <div class="field"><label>Confirm password</label><input id="na-pass2" type="password" placeholder="repeat password"></div>
+      </div>
+      <label style="margin-top:6px;">Access</label>
+      <div class="perm-grid" id="na-perms"></div>
+      <button class="btn btn-sm" style="width:auto;" onclick="createSubAdmin()">Create admin account</button>
+      <div class="save-status" id="status-newadmin"></div>
+    </div>
+
+    <div id="adminsList" style="margin-top:22px;"></div>
+  </div>
+</div>
+
+<!-- CHANGE PASSWORD MODAL -->
+<div class="mini-overlay" id="pwOverlay">
+  <div class="mini-modal" style="position:relative;">
+    <button class="mini-close btn-ghost" style="padding:4px 9px;" onclick="closePwModal()">&times;</button>
+    <h3>Change password</h3>
+    <div class="field"><label>Current password</label><input id="pw-current" type="password"></div>
+    <div class="field"><label>New password</label><input id="pw-new" type="password" placeholder="min. 6 characters"></div>
+    <div class="field"><label>Confirm new password</label><input id="pw-new2" type="password"></div>
+    <button class="btn" onclick="submitPasswordChange()">Update password</button>
+    <div class="login-error" id="pwError"></div>
+    <div class="save-status" id="pwSuccess"></div>
+  </div>
+</div>
+
+<script>
+/* ---------------- CONSTANTS ---------------- */
+const MAIN_ADMIN_UID = "Syxep12DJGVWQUiEli4Dg1yqEtP2";
+const PERM_DEFS = [
+  ['stats','Homepage stats'],
+  ['leadership','Leadership'],
+  ['events','Events'],
+  ['campus','Campus gallery'],
+  ['moments','Student moments'],
+  ['departments','Departments & members'],
+  ['registrations','Event registrations'],
+  ['admins','Manage admins']
+];
+
+let currentUser = null;
+let currentIsMain = false;
+let currentPerms = {};
+
+function hasPerm(key){ return currentIsMain || !!currentPerms[key]; }
+
+/* ---------------- AUTH ---------------- */
+function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const err = document.getElementById('loginError');
+  err.textContent = '';
+  if(!window.techtitanAuth){ err.textContent = 'Firebase not configured — check firebase-config.js'; return; }
+  techtitanAuth.signInWithEmailAndPassword(email, pass).catch(e => err.textContent = e.message);
+}
+function doLogout(){ techtitanAuth.signOut(); }
+
+if(window.techtitanAuth){
+  techtitanAuth.onAuthStateChanged(user=>{
+    document.getElementById('loginScreen').style.display = user ? 'none' : 'flex';
+    document.getElementById('shell').style.display = user ? 'block' : 'none';
+    if(user){
+      currentUser = user;
+      currentIsMain = user.uid === MAIN_ADMIN_UID;
+      loadPermissionsThenEverything();
+    } else {
+      currentUser = null;
+      currentPerms = {};
+    }
+  });
+} else {
+  document.getElementById('loginError').textContent = 'Firebase not configured — check firebase-config.js';
+}
+
+function loadPermissionsThenEverything(){
+  document.getElementById('whoami').innerHTML = `<b>${escapeHtml(currentUser.email)}</b> · ${currentIsMain ? 'MAIN ADMIN' : 'SUB-ADMIN'}`;
+  if(currentIsMain){
+    // Ensure a matching /admins doc exists so main admin shows up in the admins list too.
+    techtitanDb.collection('admins').doc(currentUser.uid).set({
+      email: currentUser.email, role: 'main',
+      permissions: Object.fromEntries(PERM_DEFS.map(([k])=>[k,true])),
+    }, { merge:true }).catch(()=>{});
+    currentPerms = Object.fromEntries(PERM_DEFS.map(([k])=>[k,true]));
+    applyPermissionsToUI();
+    loadEverything();
+  } else {
+    techtitanDb.collection('admins').doc(currentUser.uid).get().then(doc=>{
+      if(!doc.exists){
+        currentPerms = {};
+        applyPermissionsToUI();
+        return;
+      }
+      currentPerms = doc.data().permissions || {};
+      applyPermissionsToUI();
+      loadEverything();
+    }).catch(()=>{
+      currentPerms = {};
+      applyPermissionsToUI();
+    });
+  }
+}
+
+function applyPermissionsToUI(){
+  let anyVisible = false;
+  let firstVisibleTab = null;
+  document.querySelectorAll('.tab').forEach(t=>{
+    const ok = hasPerm(t.dataset.perm);
+    t.style.display = ok ? '' : 'none';
+    if(ok){ anyVisible = true; if(!firstVisibleTab) firstVisibleTab = t; }
+  });
+  document.getElementById('noAccessBanner').style.display = anyVisible ? 'none' : 'block';
+  if(anyVisible){
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    firstVisibleTab.classList.add('active');
+    document.getElementById('panel-'+firstVisibleTab.dataset.tab).classList.add('active');
+  }
+}
+
+/* ---------------- TABS ---------------- */
+document.getElementById('tabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.tab');
+  if(!btn || btn.style.display==='none') return;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+});
+
+/* ---------------- CHANGE PASSWORD ---------------- */
+function openPwModal(){
+  document.getElementById('pw-current').value='';
+  document.getElementById('pw-new').value='';
+  document.getElementById('pw-new2').value='';
+  document.getElementById('pwError').textContent='';
+  document.getElementById('pwSuccess').textContent='';
+  document.getElementById('pwOverlay').classList.add('open');
+}
+function closePwModal(){ document.getElementById('pwOverlay').classList.remove('open'); }
+function submitPasswordChange(){
+  const cur = document.getElementById('pw-current').value;
+  const n1 = document.getElementById('pw-new').value;
+  const n2 = document.getElementById('pw-new2').value;
+  const err = document.getElementById('pwError'); err.textContent='';
+  const ok = document.getElementById('pwSuccess'); ok.textContent='';
+  if(!cur || !n1 || !n2){ err.textContent = 'Fill in all three fields.'; return; }
+  if(n1.length < 6){ err.textContent = 'New password must be at least 6 characters.'; return; }
+  if(n1 !== n2){ err.textContent = "New passwords don't match."; return; }
+  const cred = firebase.auth.EmailAuthProvider.credential(currentUser.email, cur);
+  currentUser.reauthenticateWithCredential(cred)
+    .then(()=> currentUser.updatePassword(n1))
+    .then(()=>{ ok.textContent = 'Password updated ✓'; setTimeout(closePwModal, 1200); })
+    .catch(e=>{ err.textContent = e.message; });
+}
+document.getElementById('pwOverlay').addEventListener('click', e=>{ if(e.target.id==='pwOverlay') closePwModal(); });
+
+/* ---------------- MANAGE ADMINS ---------------- */
+function renderNewAdminPermGrid(){
+  document.getElementById('na-perms').innerHTML = PERM_DEFS.map(([key,label])=>`
+    <label class="perm-check"><input type="checkbox" data-na-perm="${key}"> ${label}</label>
+  `).join('');
+}
+function createSubAdmin(){
+  const email = document.getElementById('na-email').value.trim();
+  const pass = document.getElementById('na-pass').value;
+  const pass2 = document.getElementById('na-pass2').value;
+  const status = document.getElementById('status-newadmin');
+  status.style.color = 'var(--bad)'; status.textContent = '';
+  if(!email || !pass){ status.textContent = 'Email and password are required.'; return; }
+  if(pass.length < 6){ status.textContent = 'Password must be at least 6 characters.'; return; }
+  if(pass !== pass2){ status.textContent = "Passwords don't match."; return; }
+  const permissions = {};
+  document.querySelectorAll('[data-na-perm]').forEach(cb=>{ permissions[cb.dataset.naPerm] = cb.checked; });
+
+  status.style.color = 'var(--mint)'; status.textContent = 'Creating…';
+  // Create the auth user on a SECONDARY app instance so it doesn't
+  // sign the currently logged-in admin out of their own session.
+  const secondaryName = 'secondary-' + Date.now();
+  const secondaryApp = firebase.initializeApp(firebaseConfig, secondaryName);
+  secondaryApp.auth().createUserWithEmailAndPassword(email, pass)
+    .then(cred=>{
+      const newUid = cred.user.uid;
+      return techtitanDb.collection('admins').doc(newUid).set({
+        email, role:'sub', permissions, createdBy: currentUser.uid
+      }).then(()=> secondaryApp.auth().signOut());
+    })
+    .then(()=> secondaryApp.delete())
+    .then(()=>{
+      status.textContent = 'Admin account created ✓';
+      document.getElementById('na-email').value='';
+      document.getElementById('na-pass').value='';
+      document.getElementById('na-pass2').value='';
+      renderNewAdminPermGrid();
+      setTimeout(()=>status.textContent='',3000);
+    })
+    .catch(e=>{
+      status.style.color = 'var(--bad)';
+      status.textContent = 'Error: ' + e.message;
+      secondaryApp.delete().catch(()=>{});
+    });
+}
+function renderAdminsList(){
+  if(!hasPerm('admins')) return;
+  techtitanDb.collection('admins').onSnapshot(snap=>{
+    const list = snap.docs.map(d=>Object.assign({id:d.id}, d.data()));
+    list.sort((a,b)=> (a.role==='main'?-1:1) - (b.role==='main'?-1:1));
+    document.getElementById('adminsList').innerHTML = list.map(a=>{
+      const isMain = a.role==='main';
+      const isSelf = a.id === currentUser.uid;
+      return `
+      <div class="admin-card" data-uid="${a.id}">
+        <div class="admin-card-top">
+          <b>${escapeHtml(a.email)}${isSelf?' (you)':''}</b>
+          <span class="role-badge ${isMain?'':'sub'}">${isMain?'MAIN ADMIN':'SUB-ADMIN'}</span>
+        </div>
+        <div class="perm-grid">
+          ${PERM_DEFS.map(([key,label])=>`
+            <label class="perm-check ${isMain?'locked':''}">
+              <input type="checkbox" data-perm-key="${key}" ${ (isMain || a.permissions && a.permissions[key]) ? 'checked':'' } ${isMain?'disabled':''}>
+              ${label}
+            </label>`).join('')}
+        </div>
+        ${!isMain ? `
+        <div class="admin-card-actions">
+          <button class="btn-ghost btn-sm" onclick="saveAdminPerms('${a.id}')">Save access</button>
+          <button class="btn-danger" onclick="removeAdmin('${a.id}','${escapeAttr(a.email)}')">Remove dashboard access</button>
+        </div>` : `<div class="hint" style="margin:10px 0 0;">Full access — cannot be changed here.</div>`}
+      </div>`;
+    }).join('');
+  });
+}
+function saveAdminPerms(uidToSave){
+  const card = document.querySelector(`.admin-card[data-uid="${uidToSave}"]`);
+  const permissions = {};
+  card.querySelectorAll('[data-perm-key]').forEach(cb=>{ permissions[cb.dataset.permKey] = cb.checked; });
+  techtitanDb.collection('admins').doc(uidToSave).set({ permissions }, { merge:true });
+}
+function removeAdmin(uidToRemove, email){
+  if(uidToRemove === MAIN_ADMIN_UID){ alert('The main admin cannot be removed here.'); return; }
+  if(!confirm(`Remove dashboard access for ${email}?\n\nThis deletes their permissions record so they can no longer see or edit any dashboard section. Their Firebase login itself still exists — delete it from Firebase Console → Authentication → Users if you also want to block sign-in entirely.`)) return;
+  techtitanDb.collection('admins').doc(uidToRemove).delete();
+}
+
+/* ---------------- REGISTRATIONS ---------------- */
+let allRegistrations = [];
+function renderRegistrations(){
+  if(!hasPerm('registrations')) return;
+  const filter = document.getElementById('regEventFilter').value;
+  const list = filter ? allRegistrations.filter(r=>r.event===filter) : allRegistrations;
+  document.getElementById('regCount').textContent = `${list.length} registration${list.length===1?'':'s'}`;
+  document.getElementById('registrationsList').innerHTML = list.map(r => `
+    <div class="reg-card">
+      <div class="reg-top"><b>${escapeHtml(r.name)}</b><span class="reg-event">${escapeHtml(r.event)}</span></div>
+      <div class="reg-meta">
+        <div><b>Roll:</b> ${escapeHtml(r.roll)} &nbsp; <b>Class:</b> ${escapeHtml(r.class)} &nbsp; <b>Sem:</b> ${escapeHtml(r.semester)} &nbsp; <b>Section:</b> ${escapeHtml(r.section)}</div>
+        <div><b>Contact:</b> ${escapeHtml(r.contact || '—')}</div>
+        <div><b>Submitted:</b> ${r.submittedAt && r.submittedAt.toDate ? r.submittedAt.toDate().toLocaleString() : '—'}</div>
+      </div>
+    </div>
+  `).join('') || `<div class="hint">No registrations yet.</div>`;
+}
+function loadRegistrations(){
+  if(!hasPerm('registrations')) return;
+  techtitanDb.collection('registrations').orderBy('submittedAt','desc').onSnapshot(snap=>{
+    allRegistrations = snap.docs.map(d=>Object.assign({id:d.id}, d.data()));
+    const events = [...new Set(allRegistrations.map(r=>r.event).filter(Boolean))];
+    const sel = document.getElementById('regEventFilter');
+    const keep = sel.value;
+    sel.innerHTML = '<option value="">All events</option>' + events.map(e=>`<option value="${escapeAttr(e)}">${escapeHtml(e)}</option>`).join('');
+    sel.value = keep;
+    renderRegistrations();
+  }, err=>{
+    document.getElementById('registrationsList').innerHTML = `<div class="hint">Could not load registrations: ${escapeHtml(err.message)}</div>`;
+  });
+}
+
+/* ---------------- DATA ---------------- */
+const FIELD_DEFS = {
+  leadership: [['photo','Photo URL'],['role','Role'],['name','Name'],['desc','Description']],
+  events: [['tag','Tag'],['title','Title'],['desc','Description'],['date','Date'],['meta2','Meta 2 (e.g. team size)'],['meta3','Meta 3 (e.g. location)']],
+  campus: [['photo','Photo URL / filename'],['caption','Caption']],
+  moments: [['photo','Photo URL'],['title','Title'],['date','Date']]
+};
+const DEFAULT_STATS = { members: 420, eventsDone: 12, upcoming: 2, ongoing: 0 };
+const DEFAULT_LISTS = {
+  leadership: [
+    { id:'ld1', photo:'https://picsum.photos/seed/hod-xyz/500/625', role:'HEAD OF DEPARTMENT', name:'Dr. Rajeev Malhotra', desc:"Oversees the CSE department and mentors Tech Titan's technical roadmap." },
+    { id:'ld2', photo:'https://picsum.photos/seed/director-xyz/500/625', role:'DIRECTOR', name:'Dr. Anjali Sharma', desc:'Leads the institute and champions student-run initiatives like Tech Titan.' },
+    { id:'ld3', photo:'https://picsum.photos/seed/clubhead-xyz/500/625', role:'CLUB HEAD', name:'Arjun Mehta', desc:'Final-year CSE student running day-to-day operations and the robotics vertical.' }
+  ],
+  events: [
+    { id:'ev1', tag:'FLAGSHIP · HACKATHON', title:'SIH Hackathon', desc:'Internal qualifier round for Smart India Hackathon — build a working prototype against a real problem statement in 24 hours.', date:'Oct 14–15', meta2:'Team of 6', meta3:'CSE Block', status:'upcoming', openForReg:true },
+    { id:'ev2', tag:'WORKSHOP', title:'Robotics Workshop', desc:'Hands-on session covering ROS basics and line-follower builds. Laptops and kits provided, no prior experience needed.', date:'Oct 22', meta2:'Solo entry', meta3:'Lab 204', status:'upcoming', openForReg:true }
+  ],
+  campus: [
+    { id:'cp1', photo:'campus3.jpg', caption:'AERIAL VIEW' },
+    { id:'cp2', photo:'campus2.jpg', caption:'MAIN GATE' },
+    { id:'cp3', photo:'campus1.jpg', caption:'ACADEMIC BLOCK' },
+    { id:'cp4', photo:'https://picsum.photos/seed/campus4/400/800', caption:'CAMPUS' },
+    { id:'cp5', photo:'https://picsum.photos/seed/campus5/400/400', caption:'CAMPUS' },
+    { id:'cp6', photo:'https://picsum.photos/seed/campus6/400/400', caption:'CAMPUS' }
+  ],
+  moments: [
+    { id:'mo1', photo:'https://picsum.photos/seed/moment1/500/400', title:'HackTitan 1.0 finals', date:'MAR 2026' },
+    { id:'mo2', photo:'https://picsum.photos/seed/moment2/500/400', title:'Robotics workshop', date:'JAN 2026' },
+    { id:'mo3', photo:'https://picsum.photos/seed/moment3/500/400', title:'Circuit design sprint', date:'NOV 2025' }
+  ]
+};
+
+// siteContent is now stored as ONE Firestore DOCUMENT PER SECTION
+// (siteContent/stats, siteContent/leadership, ...) instead of a single
+// combined doc. This is what lets Firestore security rules enforce
+// per-section admin permissions for real, not just hide UI buttons.
+let siteContent = { stats:{}, leadership:[], events:[], campus:[], moments:[] };
+let departments = [];
+let sectionsLoaded = 0;
+const SECTION_KEYS = ['stats','leadership','events','campus','moments'];
+
+function loadEverything(){
+  renderNewAdminPermGrid();
+  if(hasPerm('admins')) renderAdminsList();
+  if(hasPerm('registrations')) loadRegistrations();
+  if(!hasPerm('stats') && !hasPerm('leadership') && !hasPerm('events') && !hasPerm('campus') && !hasPerm('moments') && !hasPerm('departments')) return;
+
+  sectionsLoaded = 0;
+  let anyExists = false;
+  const done = ()=>{
+    sectionsLoaded++;
+    if(sectionsLoaded === SECTION_KEYS.length){
+      document.getElementById('seedBanner').style.display = anyExists ? 'none' : 'block';
+      if(hasPerm('stats')) renderStatsForm();
+      ['leadership','events','campus','moments'].forEach(k=>{ if(hasPerm(k)) renderListForm(k); });
+    }
+  };
+  SECTION_KEYS.forEach(key=>{
+    techtitanDb.collection('siteContent').doc(key).get().then(doc=>{
+      if(doc.exists){
+        anyExists = true;
+        siteContent[key] = key==='stats' ? doc.data() : (doc.data().items || []);
+      } else {
+        siteContent[key] = key==='stats' ? {members:0,eventsDone:0,upcoming:0,ongoing:0} : [];
+      }
+      done();
+    }).catch(()=> done());
+  });
+
+  if(hasPerm('departments')){
+    techtitanDb.collection('departments').onSnapshot(snap=>{
+      departments = snap.docs.map(d=>Object.assign({id:d.id}, d.data()));
+      renderDeptList();
+    });
+  }
+}
+
+function uid(){ return Math.random().toString(36).slice(2,9); }
+
+function seedInitialContent(){
+  const writes = [
+    techtitanDb.collection('siteContent').doc('stats').set(DEFAULT_STATS),
+    techtitanDb.collection('siteContent').doc('leadership').set({ items: DEFAULT_LISTS.leadership }),
+    techtitanDb.collection('siteContent').doc('events').set({ items: DEFAULT_LISTS.events }),
+    techtitanDb.collection('siteContent').doc('campus').set({ items: DEFAULT_LISTS.campus }),
+    techtitanDb.collection('siteContent').doc('moments').set({ items: DEFAULT_LISTS.moments })
+  ];
+  Promise.all(writes)
+    .then(()=>{
+      document.getElementById('seedBanner').style.display = 'none';
+      siteContent.stats = Object.assign({}, DEFAULT_STATS);
+      siteContent.leadership = JSON.parse(JSON.stringify(DEFAULT_LISTS.leadership));
+      siteContent.events = JSON.parse(JSON.stringify(DEFAULT_LISTS.events));
+      siteContent.campus = JSON.parse(JSON.stringify(DEFAULT_LISTS.campus));
+      siteContent.moments = JSON.parse(JSON.stringify(DEFAULT_LISTS.moments));
+      renderStatsForm();
+      renderListForm('leadership'); renderListForm('events'); renderListForm('campus'); renderListForm('moments');
+    })
+    .catch(e=>alert('Could not initialize: '+e.message));
+}
+
+/* ---- stats ---- */
+function renderStatsForm(){
+  const s = siteContent.stats || {};
+  document.getElementById('s-members').value = s.members ?? 0;
+  document.getElementById('s-eventsDone').value = s.eventsDone ?? 0;
+  document.getElementById('s-upcoming').value = s.upcoming ?? 0;
+  document.getElementById('s-ongoing').value = s.ongoing ?? 0;
+}
+function saveStats(){
+  siteContent.stats = {
+    members: parseInt(document.getElementById('s-members').value,10) || 0,
+    eventsDone: parseInt(document.getElementById('s-eventsDone').value,10) || 0,
+    upcoming: parseInt(document.getElementById('s-upcoming').value,10) || 0,
+    ongoing: parseInt(document.getElementById('s-ongoing').value,10) || 0
+  };
+  pushSection('stats', siteContent.stats);
+}
+
+/* ---- generic list editors (leadership / events / campus / moments) ---- */
+function renderListForm(key){
+  const list = siteContent[key] || [];
+  const el = document.getElementById(key+'List');
+  const fields = FIELD_DEFS[key];
+  el.innerHTML = list.map((item,i) => `
+    <div class="item-card" data-idx="${i}">
+      <div class="item-top"><span>#${i+1}</span><button class="btn-danger" onclick="removeItem('${key}',${i})">Remove</button></div>
+      ${fields.map(([f,label]) => `
+        <div class="field"><label>${label}</label>${
+          f==='desc' ? `<textarea rows="2" data-field="${f}">${escapeAttr(item[f])}</textarea>`
+          : `<input data-field="${f}" value="${escapeAttr(item[f])}">`
+        }</div>`).join('')}
+      ${key==='events' ? `
+        <div class="row2">
+          <div class="field"><label>Status</label>
+            <select data-field="status">
+              <option value="upcoming" ${item.status==='upcoming'?'selected':''}>Upcoming</option>
+              <option value="ongoing" ${item.status==='ongoing'?'selected':''}>Ongoing</option>
+              <option value="done" ${item.status==='done'?'selected':''}>Completed</option>
+            </select>
+          </div>
+          <div class="check-row" style="margin-top:22px;"><input type="checkbox" data-field="openForReg" ${item.openForReg?'checked':''}> <label style="margin:0;">Open for registration</label></div>
+        </div>` : ''}
+    </div>
+  `).join('') || `<div class="hint">Nothing here yet — click "Add" below.</div>`;
+}
+function addItem(key){
+  siteContent[key] = siteContent[key] || [];
+  const blank = {}; FIELD_DEFS[key].forEach(([f])=>blank[f]='');
+  blank.id = uid();
+  if(key==='events'){ blank.status='upcoming'; blank.openForReg=false; }
+  siteContent[key].push(blank);
+  renderListForm(key);
+}
+function removeItem(key,i){ siteContent[key].splice(i,1); renderListForm(key); }
+function saveList(key){
+  const cards = document.querySelectorAll(`#${key}List .item-card`);
+  const list = [];
+  cards.forEach((card,i)=>{
+    const obj = Object.assign({}, siteContent[key][i]);
+    card.querySelectorAll('[data-field]').forEach(inp=>{
+      const f = inp.dataset.field;
+      obj[f] = inp.type==='checkbox' ? inp.checked : inp.value;
+    });
+    list.push(obj);
+  });
+  siteContent[key] = list;
+  pushSection(key, { items: list });
+}
+function pushSection(key, data){
+  const statusEl = document.getElementById('status-'+key);
+  statusEl.textContent = 'Saving…';
+  techtitanDb.collection('siteContent').doc(key).set(data, { merge:true })
+    .then(()=>{ statusEl.textContent = 'Saved ✓ — live on the site now.'; setTimeout(()=>statusEl.textContent='',3000); })
+    .catch(e=>{ statusEl.textContent = 'Error: '+e.message; });
+}
+
+/* ---- departments ---- */
+function renderDeptList(){
+  const el = document.getElementById('deptList');
+  el.innerHTML = departments.map(d => `
+    <div class="dept-block" data-id="${d.id}">
+      <div class="dept-block-head">
+        <input value="${escapeAttr(d.name)}" data-dept-name>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-ghost" onclick="saveDept('${d.id}')">Save</button>
+          <button class="btn-danger" onclick="deleteDept('${d.id}')">Delete department</button>
+        </div>
+      </div>
+      <div class="dept-block-body">
+        <div class="students" id="students-${d.id}">
+          ${(d.students||[]).map((s,i)=>`
+            <div class="student-row" data-idx="${i}">
+              <div class="row3">
+                <div class="field"><label>Name</label><input data-s-field="name" value="${escapeAttr(s.name)}"></div>
+                <div class="field"><label>Year</label><input data-s-field="year" value="${escapeAttr(s.year)}"></div>
+                <div class="field"><label>Contact</label><input data-s-field="contact" value="${escapeAttr(s.contact)}"></div>
+              </div>
+              <div class="field"><label>Photo URL (optional)</label><input data-s-field="photo" value="${escapeAttr(s.photo)}"></div>
+              <button class="btn-danger" onclick="removeStudent('${d.id}',${i})">Remove student</button>
+            </div>
+          `).join('') || '<div class="hint">No members yet.</div>'}
+        </div>
+        <button class="btn-ghost" onclick="addStudent('${d.id}')">+ Add member</button>
+      </div>
+    </div>
+  `).join('') || `<div class="hint">No departments yet — click "Add department" below.</div>`;
+}
+function addDept(){
+  techtitanDb.collection('departments').add({ name:'New department', students:[] });
+}
+function deleteDept(id){
+  if(confirm('Delete this department and all its members?')) techtitanDb.collection('departments').doc(id).delete();
+}
+function addStudent(deptId){
+  const d = departments.find(x=>x.id===deptId);
+  d.students = d.students || [];
+  d.students.push({ name:'', year:'', contact:'', photo:'' });
+  renderDeptList();
+}
+function removeStudent(deptId,i){
+  const d = departments.find(x=>x.id===deptId);
+  d.students.splice(i,1);
+  renderDeptList();
+}
+function saveDept(deptId){
+  const block = document.querySelector(`.dept-block[data-id="${deptId}"]`);
+  const name = block.querySelector('[data-dept-name]').value;
+  const students = [];
+  block.querySelectorAll('.student-row').forEach(row=>{
+    const s = {};
+    row.querySelectorAll('[data-s-field]').forEach(inp=> s[inp.dataset.sField] = inp.value);
+    students.push(s);
+  });
+  techtitanDb.collection('departments').doc(deptId).set({ name, students }, { merge:true });
+}
+
+function escapeAttr(v){
+  return (v==null?'':String(v)).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str==null ? '' : String(str);
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>

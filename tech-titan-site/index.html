@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tech Titan — CGC Landran</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Firebase (shared live data store — see firebase-config.js) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<style>
+  :root{
+    --bg:#02040a;
+    --panel:#0a0f1e;
+    --panel-2:#0e1526;
+    --blue:#3d7fff;
+    --amber:#ffb020;
+    --mint:#5eead4;
+    --ink:#eef2ff;
+    --slate:#7783a1;
+    --line:rgba(120,150,255,0.16);
+    --mono:'JetBrains Mono', monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;overflow-x:hidden;}
+  h1,h2,h3{font-family:'Space Grotesk',sans-serif;}
+  a{color:inherit;text-decoration:none;}
+  img{display:block;max-width:100%;}
+  button{font-family:inherit;cursor:pointer;}
+  ::selection{background:var(--blue);color:#fff;}
+
+  .hexfield{position:fixed;inset:0;z-index:-3;
+    background:
+      radial-gradient(ellipse 80% 60% at 15% 0%, rgba(61,127,255,0.14), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 100% 20%, rgba(94,234,212,0.08), transparent 60%),
+      var(--bg);
+  }
+  .hexfield svg{position:absolute;inset:0;width:100%;height:100%;opacity:0.35;}
+  .scanline{position:fixed;inset:0;z-index:-2;pointer-events:none;
+    background:linear-gradient(180deg, transparent 0%, rgba(61,127,255,0.05) 50%, transparent 100%);
+    background-size:100% 6px;animation:scan 9s linear infinite;opacity:0.5;
+  }
+  @keyframes scan{0%{background-position:0 0;}100%{background-position:0 600px;}}
+
+  /* ---------- LOGO + PIXEL DISSOLVE ---------- */
+  .logo-frame{position:relative;flex-shrink:0;}
+  .logo-frame img{width:100%;height:100%;object-fit:contain;}
+  .logo-badge{
+    width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(145deg, var(--panel-2), var(--panel));
+    border:1px solid var(--line);
+    font-family:'Space Grotesk';font-weight:700;color:var(--blue);
+  }
+  .pixel-overlay{position:absolute;inset:0;display:grid;pointer-events:none;}
+  .pixel-overlay .cell{background:var(--bg);opacity:0;}
+
+  .white-plate{background:#fff;padding:4px;border:1px solid var(--line);}
+
+  /* ---------- NAV ---------- */
+  .nav{
+    position:fixed;top:0;left:0;right:0;z-index:60;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px clamp(20px,4vw,56px);
+    background:rgba(2,4,10,0.75);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+    gap:14px;
+  }
+  .nav-cgc{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+  .nav-cgc-text{display:flex;flex-direction:column;line-height:1.2;}
+  .nav-cgc-text b{font-family:'Space Grotesk';font-size:12.5px;font-weight:700;letter-spacing:.01em;}
+  .nav-cgc-text span{font-family:var(--mono);font-size:9.5px;color:var(--slate);letter-spacing:.04em;}
+  .nav-links{display:flex;gap:32px;font-family:var(--mono);font-size:12px;letter-spacing:0.04em;color:var(--slate);}
+  .nav-links a{transition:color .2s;}
+  .nav-links a:hover{color:var(--ink);}
+  #cctLogoSlot{width:44px;height:44px;}
+  #navLogoSlot{width:62px;height:62px;opacity:0;transition:opacity .35s ease;flex-shrink:0;}
+  #navLogoSlot.show{opacity:1;}
+  .nav-right{display:flex;align-items:center;gap:16px;}
+  .nav-burger{display:none;flex-direction:column;justify-content:center;gap:5px;width:36px;height:36px;background:transparent;border:1px solid var(--line);flex-shrink:0;}
+  .nav-burger span{display:block;width:16px;height:1.5px;background:var(--ink);margin:0 auto;transition:transform .25s, opacity .25s;}
+  .nav-burger.open span:nth-child(1){transform:translateY(6.5px) rotate(45deg);}
+  .nav-burger.open span:nth-child(2){opacity:0;}
+  .nav-burger.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg);}
+  .mobile-menu{display:none;position:fixed;top:0;right:0;bottom:0;width:min(78vw,300px);z-index:59;
+    background:rgba(4,7,16,0.98);backdrop-filter:blur(10px);border-left:1px solid var(--line);
+    padding:90px 28px 28px;flex-direction:column;gap:4px;transform:translateX(100%);transition:transform .3s ease;}
+  .mobile-menu.open{display:flex;transform:translateX(0);}
+  .mobile-menu a{font-family:var(--mono);font-size:14px;letter-spacing:.03em;color:var(--ink);padding:14px 0;border-bottom:1px solid var(--line);}
+  .mobile-menu-backdrop{display:none;position:fixed;inset:0;z-index:58;background:rgba(2,4,10,0.6);}
+  .mobile-menu-backdrop.open{display:block;}
+
+  /* ---------- INTRO OVERLAY ---------- */
+  #introOverlay{
+    position:fixed;inset:0;z-index:100;background:rgba(2,4,10,0.75);
+    display:flex;align-items:center;justify-content:center;transition:opacity .5s ease;
+  }
+  #introOverlay.hide{opacity:0;pointer-events:none;}
+  #introLogoWrap{
+    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    transition:transform .95s cubic-bezier(.65,0,.2,1), opacity .4s ease .75s;
+  }
+  #introLogoWrap.fly{opacity:0;}
+
+  /* ---------- MAIN ---------- */
+  .main{padding-top:74px;}
+
+  .hero{
+    position:relative;padding:64px clamp(24px,5vw,72px) 90px;
+    display:flex;flex-direction:column;align-items:center;text-align:center;
+    min-height:82vh;justify-content:center;
+  }
+  #heroLogoSlot{width:200px;height:200px;margin-bottom:34px;opacity:0;transition:opacity .5s ease;}
+  #heroLogoSlot.show{opacity:1;}
+  .hero-eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--mint);letter-spacing:0.06em;margin-bottom:20px;display:flex;align-items:center;gap:10px;justify-content:center;}
+  .hero-eyebrow::before{content:'';width:8px;height:8px;background:var(--mint);box-shadow:0 0 10px var(--mint);}
+  .hero h1{font-size:clamp(3rem,7vw,5.8rem);line-height:0.98;font-weight:700;letter-spacing:-0.01em;color:var(--ink);}
+  .hero h1 .accent{color:var(--blue);}
+  .hero-college{margin-top:18px;font-family:var(--mono);font-size:13px;color:var(--slate);letter-spacing:0.03em;}
+  .hero-sub{margin-top:22px;color:var(--slate);font-size:16px;line-height:1.65;max-width:520px;}
+  .hero-actions{display:flex;gap:14px;margin-top:38px;flex-wrap:wrap;justify-content:center;}
+  .btn-primary{background:var(--blue);color:#fff;padding:15px 28px;font-weight:600;font-size:14px;border:1px solid var(--blue);transition:transform .2s;}
+  .btn-primary:hover{transform:translateY(-2px);}
+  .btn-ghost{border:1px solid var(--line);padding:15px 28px;font-size:14px;font-weight:500;transition:border-color .2s,color .2s;color:var(--ink);background:transparent;}
+  .btn-ghost:hover{border-color:var(--mint);color:var(--mint);}
+  .btn-small{border:1px solid var(--line);padding:9px 18px;font-size:12.5px;font-weight:500;color:var(--ink);background:transparent;transition:border-color .2s,color .2s;}
+  .btn-small:hover{border-color:var(--amber);color:var(--amber);}
+
+  .hero-readout{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);margin:56px auto 0;border:1px solid var(--line);max-width:640px;}
+  .readout-cell{background:var(--bg);padding:16px 18px;}
+  .readout-cell b{display:block;font-family:'Space Grotesk';font-size:1.7rem;font-weight:700;}
+  .readout-cell span{font-family:var(--mono);font-size:10px;color:var(--slate);letter-spacing:0.04em;}
+
+  .reveal{opacity:0;transform:translateY(28px);transition:opacity .7s ease, transform .7s ease;}
+  .reveal.in{opacity:1;transform:translateY(0);}
+
+  .panel-section{padding:90px clamp(24px,5vw,72px);border-top:1px solid var(--line);position:relative;}
+  .panel-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;margin-bottom:52px;flex-wrap:wrap;}
+  .panel-ref{font-family:var(--mono);font-size:11.5px;color:var(--amber);letter-spacing:0.06em;margin-bottom:10px;}
+  .panel-head h2{font-size:clamp(1.7rem,3vw,2.3rem);font-weight:600;max-width:600px;line-height:1.2;}
+  .panel-note{font-family:var(--mono);color:var(--slate);font-size:12px;max-width:280px;line-height:1.7;}
+
+  .lead-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;}
+  .tilt-card{background:var(--panel);border:1px solid var(--line);transform-style:preserve-3d;transition:transform .15s ease, border-color .3s;}
+  .tilt-card:hover{border-color:var(--blue);}
+  .tilt-photo{aspect-ratio:4/5;overflow:hidden;position:relative;border-bottom:1px solid var(--line);}
+  .tilt-photo img{width:100%;height:100%;object-fit:cover;filter:grayscale(0.4) contrast(1.05);transition:filter .3s;}
+  .tilt-card:hover .tilt-photo img{filter:grayscale(0) contrast(1.05);}
+  .tilt-body{padding:22px 24px;}
+  .tilt-role{font-family:var(--mono);color:var(--amber);font-size:11px;letter-spacing:0.05em;margin-bottom:8px;}
+  .tilt-name{font-size:1.25rem;font-weight:600;margin-bottom:10px;}
+  .tilt-desc{color:var(--slate);font-size:13.5px;line-height:1.6;}
+
+  .events-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;}
+  .event-card{border:1px solid var(--line);background:var(--panel);padding:30px;transition:transform .25s, border-color .25s;display:flex;flex-direction:column;}
+  .event-card:hover{transform:translateY(-4px);border-color:var(--mint);}
+  .event-tag-top{font-family:var(--mono);color:var(--mint);font-size:11px;letter-spacing:0.05em;margin-bottom:14px;}
+  .event-card h4{font-size:1.4rem;font-weight:600;margin-bottom:10px;}
+  .event-card p{color:var(--slate);font-size:14px;line-height:1.65;flex:1;}
+  .event-meta{font-family:var(--mono);font-size:11.5px;color:var(--slate);margin:16px 0 20px;display:flex;gap:18px;flex-wrap:wrap;}
+  .event-meta b{color:var(--ink);}
+
+  .mosaic{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:170px;gap:10px;}
+  .mosaic a{position:relative;overflow:hidden;border:1px solid var(--line);display:block;}
+  .mosaic a:nth-child(1){grid-column:span 2;grid-row:span 2;}
+  .mosaic a:nth-child(4){grid-row:span 2;}
+  .mosaic img{width:100%;height:100%;object-fit:cover;transition:transform .5s ease, filter .5s ease;filter:saturate(0.85);}
+  .mosaic a:hover img{transform:scale(1.06);filter:saturate(1.1);}
+  .mosaic .cap{position:absolute;left:0;right:0;bottom:0;padding:12px 14px;background:linear-gradient(to top, rgba(2,4,10,0.9), transparent);font-family:var(--mono);font-size:11px;color:var(--slate);transform:translateY(8px);opacity:0;transition:transform .3s, opacity .3s;}
+  .mosaic a:hover .cap{transform:translateY(0);opacity:1;}
+
+  .moments-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+  .moment-card{border:1px solid var(--line);background:var(--panel);overflow:hidden;transition:transform .25s, border-color .25s;}
+  .moment-card:hover{transform:translateY(-4px);border-color:var(--blue);}
+  .moment-card img{width:100%;height:200px;object-fit:cover;}
+  .moment-caption{padding:16px 18px;}
+  .moment-caption h5{font-size:14px;font-weight:600;}
+  .moment-caption span{font-family:var(--mono);font-size:11px;color:var(--slate);}
+
+  .cta-band{text-align:center;padding:110px 24px;position:relative;
+    background:radial-gradient(ellipse 60% 80% at 50% 0%, rgba(61,127,255,0.14), transparent 70%), var(--panel);}
+  .cta-band h2{font-size:clamp(2rem,4.6vw,3rem);font-weight:600;max-width:640px;margin:0 auto 18px;line-height:1.2;}
+  .cta-band p{font-family:var(--mono);color:var(--slate);max-width:440px;margin:0 auto 36px;font-size:12.5px;line-height:1.7;}
+
+  /* ---------- FOOTER ---------- */
+  footer{border-top:1px solid var(--line);background:var(--panel);}
+  .footer-top{
+    padding:64px clamp(24px,5vw,72px) 48px;
+    display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:40px;
+  }
+  .footer-brand{display:flex;align-items:center;gap:14px;margin-bottom:16px;}
+  .footer-brand-name{font-family:'Space Grotesk';font-size:1.2rem;font-weight:700;}
+  .footer-brand-sub{font-family:var(--mono);font-size:11.5px;color:var(--slate);margin-top:2px;}
+  .footer-desc{color:var(--slate);font-size:13.5px;line-height:1.7;max-width:340px;}
+  .footer-brand-link{transition:opacity .2s;}
+  .footer-brand-link:hover{opacity:0.75;}
+  .footer-brand-link:hover .footer-brand-name{color:var(--blue);}
+  .footer-col h5{font-family:var(--mono);font-size:11px;color:var(--amber);letter-spacing:0.06em;margin-bottom:18px;}
+  .footer-col a, .footer-col .f-line{display:flex;align-items:center;gap:10px;color:var(--slate);font-size:13.5px;margin-bottom:14px;transition:color .2s;}
+  .footer-col a:hover{color:var(--mint);}
+  .footer-col .ico{
+    width:28px;height:28px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:var(--mono);font-size:12px;color:var(--slate);
+  }
+  .footer-links a{display:block;color:var(--slate);font-size:13.5px;margin-bottom:12px;transition:color .2s;}
+  .footer-links a:hover{color:var(--ink);}
+  .footer-bottom{
+    border-top:1px solid var(--line);padding:20px clamp(24px,5vw,72px);
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;
+  }
+  .footer-bottom span{font-family:var(--mono);font-size:11px;color:var(--slate);}
+
+  /* ---------- REGISTRATION MODAL ---------- */
+  #regOverlay{position:fixed;inset:0;z-index:90;background:rgba(2,4,10,0.78);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px;}
+  #regOverlay.open{display:flex;}
+  .modal{width:100%;max-width:560px;background:var(--panel);border:1px solid var(--line);position:relative;max-height:88vh;overflow-y:auto;}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;padding:22px 26px;border-bottom:1px solid var(--line);}
+  .modal-head h3{font-size:1.2rem;font-weight:600;}
+  .modal-head .modal-ref{font-family:var(--mono);color:var(--amber);font-size:10.5px;letter-spacing:0.05em;display:block;margin-bottom:4px;}
+  .modal-close{background:none;border:1px solid var(--line);color:var(--slate);width:30px;height:30px;font-size:16px;line-height:1;}
+  .modal-close:hover{color:var(--ink);border-color:var(--mint);}
+  .modal-body{padding:26px;}
+  .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .choice-card{border:1px solid var(--line);padding:22px 18px;background:var(--panel-2);text-align:left;transition:border-color .2s, transform .2s;}
+  .choice-card:hover{border-color:var(--blue);transform:translateY(-3px);}
+  .choice-tag{font-family:var(--mono);color:var(--mint);font-size:10.5px;letter-spacing:0.04em;margin-bottom:10px;}
+  .choice-card h4{font-size:1.05rem;font-weight:600;margin-bottom:8px;}
+  .choice-card p{color:var(--slate);font-size:12.5px;line-height:1.55;}
+  .form-selected{font-family:var(--mono);font-size:11.5px;color:var(--mint);margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);padding:10px 14px;}
+  .form-selected button{background:none;border:none;color:var(--slate);font-family:var(--mono);font-size:11px;text-decoration:underline;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-family:var(--mono);font-size:11px;color:var(--slate);letter-spacing:0.03em;margin-bottom:7px;}
+  .field input, .field select{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--ink);padding:11px 13px;font-family:'Inter';font-size:14px;}
+  .field input:focus, .field select:focus{outline:none;border-color:var(--blue);}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .submit-row{display:flex;gap:12px;margin-top:22px;}
+  .confirm-view{text-align:center;padding:20px 0;}
+  .confirm-icon{width:52px;height:52px;border:1px solid var(--mint);color:var(--mint);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:22px;font-family:var(--mono);}
+  .confirm-view h4{font-size:1.2rem;font-weight:600;margin-bottom:10px;}
+  .confirm-view p{color:var(--slate);font-size:13.5px;line-height:1.6;max-width:360px;margin:0 auto;}
+  .hidden{display:none !important;}
+
+  @media(max-width:900px){
+    .nav-links{display:none;}
+    .nav-burger{display:flex;}
+    .nav-cgc-text span{display:none;}
+    .lead-grid,.moments-grid{grid-template-columns:repeat(2,1fr);}
+    .events-grid{grid-template-columns:1fr;}
+    .mosaic{grid-template-columns:repeat(2,1fr);}
+    .mosaic a:nth-child(1){grid-column:span 2;grid-row:span 1;aspect-ratio:2/1;}
+    .mosaic a:nth-child(4){grid-row:span 1;}
+    .choice-grid{grid-template-columns:1fr;}
+    .form-row{grid-template-columns:1fr;}
+    .footer-top{grid-template-columns:1fr;gap:32px;}
+    .hero-readout{grid-template-columns:repeat(2,1fr);}
+    .panel-section{padding:64px clamp(20px,5vw,72px);}
+    .panel-head{margin-bottom:36px;}
+  }
+  @media(max-width:560px){
+    .lead-grid,.moments-grid{grid-template-columns:1fr;}
+    .hero-readout{grid-template-columns:1fr;max-width:none;}
+    #heroLogoSlot{width:140px;height:140px;}
+    .hero{padding:48px 20px 64px;min-height:auto;}
+    .hero-actions{flex-direction:column;width:100%;}
+    .hero-actions .btn-primary,.hero-actions .btn-ghost{width:100%;text-align:center;}
+    .nav-cgc-text{display:none;}
+    .modal-body{padding:20px;}
+    .cta-band{padding:70px 20px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="hexfield">
+  <svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <pattern id="hex" width="40" height="70" patternUnits="userSpaceOnUse" patternTransform="scale(1.4)">
+        <path d="M20 0 L40 12 L40 35 L20 47 L0 35 L0 12 Z" fill="none" stroke="rgba(120,150,255,0.5)" stroke-width="0.5"/>
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#hex)"/>
+  </svg>
+</div>
+<div class="scanline"></div>
+
+<!-- INTRO SPLASH -->
+<div id="introOverlay">
+  <div id="introLogoWrap"></div>
+</div>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-cgc">
+    <div id="cctLogoSlot" class="white-plate"><img src="logo.png" alt="CGC Landran logo"></div>
+    <div class="nav-cgc-text"><b>CGC LANDRAN</b><span>CHANDIGARH GROUP OF COLLEGES</span></div>
+  </div>
+  <div class="nav-links">
+    <a href="#events">EVENTS</a>
+    <a href="#gallery">CAMPUS</a>
+    <a href="#moments">MOMENTS</a>
+    <a href="departments.html">DEPARTMENTS</a>
+  </div>
+  <div class="nav-right">
+    <div id="navLogoSlot"></div>
+    <button class="nav-burger" id="navBurger" aria-label="Open menu"><span></span><span></span><span></span></button>
+  </div>
+</nav>
+<div class="mobile-menu-backdrop" id="mobileBackdrop"></div>
+<div class="mobile-menu" id="mobileMenu">
+  <a href="#events">EVENTS</a>
+  <a href="#gallery">CAMPUS</a>
+  <a href="#moments">MOMENTS</a>
+  <a href="departments.html">DEPARTMENTS</a>
+</div>
+
+<div class="main">
+
+  <!-- HERO -->
+  <section class="hero" id="top">
+    <div id="heroLogoSlot"></div>
+    <div class="hero-eyebrow">CGC LANDRAN // STUDENT TECH CLUB</div>
+    <h1>TECH <span class="accent">TITAN</span></h1>
+    <div class="hero-college">CGC LANDRAN</div>
+    <p class="hero-sub">Robotics, code, and everything electric — built by students, for students. This is where ideas get soldered, compiled, and shipped.</p>
+    <div class="hero-actions">
+      <button class="btn-primary" onclick="openReg()">Register for an event</button>
+      <a href="#events" class="btn-ghost">View schedule</a>
+    </div>
+    <div class="hero-readout reveal" id="stats"></div>
+  </section>
+
+  <!-- LEADERSHIP -->
+  <section class="panel-section reveal" id="leadership">
+    <div class="panel-head">
+      <div>
+        <div class="panel-ref">MODULE // LEADERSHIP</div>
+        <h2>The people behind Tech Titan</h2>
+      </div>
+      <p class="panel-note">HOD, Director, and Club Head — the chain of support that keeps the club running.</p>
+    </div>
+    <div class="lead-grid" id="leadershipGrid"></div>
+  </section>
+
+  <!-- EVENTS -->
+  <section class="panel-section reveal" id="events">
+    <div class="panel-head">
+      <div>
+        <div class="panel-ref">MODULE // EVENTS</div>
+        <h2>Current events</h2>
+      </div>
+      <p class="panel-note" id="eventsNote">Events open for registration right now. Pick one to get started.</p>
+    </div>
+    <div class="events-grid" id="eventsGrid"></div>
+  </section>
+
+  <!-- CAMPUS GALLERY -->
+  <section class="panel-section reveal" id="gallery">
+    <div class="panel-head">
+      <div>
+        <div class="panel-ref">MODULE // CAMPUS</div>
+        <h2>Chandigarh Group of Colleges, Landran</h2>
+      </div>
+      <p class="panel-note">Where it all happens — labs, blocks, and the spaces the club calls home.</p>
+    </div>
+    <div class="mosaic" id="campusMosaic"></div>
+  </section>
+
+  <!-- STUDENT MOMENTS -->
+  <section class="panel-section reveal" id="moments">
+    <div class="panel-head">
+      <div>
+        <div class="panel-ref">MODULE // MOMENTS</div>
+        <h2>Students at work</h2>
+      </div>
+      <p class="panel-note">Builds, wins, and late-night debugging from past events.</p>
+    </div>
+    <div class="moments-grid" id="momentsGrid"></div>
+  </section>
+
+  <!-- REGISTER CTA -->
+  <section class="cta-band" id="register">
+    <h2>Ready to build something?</h2>
+    <p id="ctaNote">SIH HACKATHON AND THE ROBOTICS WORKSHOP ARE OPEN NOW · LIMITED SEATS</p>
+    <button class="btn-primary" onclick="openReg()">Register for an event</button>
+  </section>
+
+  <footer>
+    <div class="footer-top">
+      <div>
+        <a href="departments.html" class="footer-brand-link" style="display:block;">
+          <div class="footer-brand">
+            <div id="footerLogoSlot" style="width:56px;height:56px;"></div>
+            <div>
+              <div class="footer-brand-name">TECH TITAN</div>
+              <div class="footer-brand-sub">CGC Landran, Landran, Mohali</div>
+            </div>
+          </div>
+          <p class="footer-desc">The official student-run tech club of CGC Landran — robotics, hackathons, and hands-on workshops all year round.</p>
+        </a>
+      </div>
+      <div class="footer-col">
+        <h5>QUICK LINKS</h5>
+        <div class="footer-links">
+          <a href="#events">Events</a>
+          <a href="#gallery">Campus</a>
+          <a href="#moments">Moments</a>
+          <a href="#leadership">Leadership</a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h5>GET IN TOUCH</h5>
+        <a href="https://instagram.com/techtitans.cct" target="_blank" rel="noopener">
+          <span class="ico">IG</span> @techtitans.cct
+        </a>
+        <a href="mailto:techtitans.cct@gmail.com">
+          <span class="ico">@</span> techtitans.cct@gmail.com
+        </a>
+        <a href="tel:+919501303799">
+          <span class="ico">☎</span> +91 95013 03799
+        </a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 TECH TITAN · CGC LANDRAN</span>
+      <span>BUILT BY THE WEB & DESIGN VERTICAL</span>
+    </div>
+  </footer>
+</div>
+
+<!-- REGISTRATION MODAL -->
+<div id="regOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <span class="modal-ref">REGISTRATION</span>
+        <h3 id="modalTitle">Choose an event</h3>
+      </div>
+      <button class="modal-close" onclick="closeReg()">&times;</button>
+    </div>
+    <div class="modal-body">
+
+      <div id="stepChoice">
+        <div class="choice-grid" id="choiceGrid"></div>
+      </div>
+
+      <div id="stepForm" class="hidden">
+        <div class="form-selected">
+          <span>REGISTERING FOR: <b id="selectedEventLabel" style="color:var(--ink)"></b></span>
+          <button type="button" onclick="backToChoice()">change</button>
+        </div>
+        <form id="regForm" onsubmit="submitReg(event)">
+          <div class="field">
+            <label for="f-name">Full name</label>
+            <input id="f-name" type="text" required placeholder="e.g. Priya Nair">
+          </div>
+          <div class="form-row">
+            <div class="field">
+              <label for="f-roll">Roll number</label>
+              <input id="f-roll" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="12" required placeholder="e.g. 2214xxxx" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+            </div>
+            <div class="field">
+              <label for="f-class">Class</label>
+              <input id="f-class" type="text" required placeholder="e.g. CSE-3">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="field">
+              <label for="f-sem">Semester</label>
+              <select id="f-sem" required>
+                <option value="" disabled selected>Select</option>
+                <option>1</option><option>2</option><option>3</option><option>4</option>
+                <option>5</option><option>6</option><option>7</option><option>8</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="f-section">Section</label>
+              <input id="f-section" type="text" required placeholder="e.g. A">
+            </div>
+          </div>
+          <div class="field">
+            <label for="f-contact">Phone or email</label>
+            <input id="f-contact" type="text" required placeholder="e.g. 98xxxxxx10 or you@email.com">
+          </div>
+          <div class="submit-row">
+            <button type="button" class="btn-ghost" onclick="backToChoice()" style="flex:1;">Back</button>
+            <button type="submit" class="btn-primary" id="regSubmitBtn" style="flex:1;">Submit registration</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="stepConfirm" class="hidden confirm-view">
+        <div class="confirm-icon">✓</div>
+        <h4>You're registered!</h4>
+        <p id="confirmText">We've noted your entry. Confirmation details will be shared over email before the event.</p>
+        <button class="btn-ghost" style="margin-top:24px;" onclick="closeReg()">Done</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   LOGO + PIXEL DISSOLVE
+   Swap TECH_TITAN_LOGO_SRC to the real logo file once you
+   have it (e.g. 'tech-titan-logo.png'). Until then it falls
+   back to a plain "TT" badge so the layout/animation can be
+   previewed.
+   ========================================================= */
+const TECH_TITAN_LOGO_SRC = 'tech-titan-logo.png';
+const GRID = 12; // 12 x 12 pixel-dissolve grid, as requested
+
+function buildLogoFrame(sizePx, withDissolve){
+  const frame = document.createElement('div');
+  frame.className = 'logo-frame';
+  frame.style.width = sizePx+'px';
+  frame.style.height = sizePx+'px';
+
+  if(TECH_TITAN_LOGO_SRC){
+    const img = document.createElement('img');
+    img.src = TECH_TITAN_LOGO_SRC;
+    img.alt = 'Tech Titan logo';
+    frame.appendChild(img);
+  } else {
+    const badge = document.createElement('div');
+    badge.className = 'logo-badge';
+    badge.style.fontSize = (sizePx*0.36)+'px';
+    badge.textContent = 'TT';
+    frame.appendChild(badge);
+  }
+
+  if(withDissolve){
+    const overlay = document.createElement('div');
+    overlay.className = 'pixel-overlay';
+    overlay.style.gridTemplateColumns = `repeat(${GRID}, 1fr)`;
+    overlay.style.gridTemplateRows = `repeat(${GRID}, 1fr)`;
+    const cells = [];
+    for(let i=0;i<GRID*GRID;i++){
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      overlay.appendChild(cell);
+      cells.push(cell);
+    }
+    frame.appendChild(overlay);
+    startSparseFlicker(cells);
+  }
+  return frame;
+}
+
+// only 1-2 of the 144 cells are ever "covering" the logo at once
+function startSparseFlicker(cells){
+  function tick(){
+    const n = Math.random() < 0.5 ? 1 : 2;
+    for(let i=0;i<n;i++){
+      const cell = cells[Math.floor(Math.random()*cells.length)];
+      cell.style.opacity = '1';
+      setTimeout(()=>{ cell.style.opacity = '0'; }, 120 + Math.random()*220);
+    }
+    setTimeout(tick, 260 + Math.random()*320);
+  }
+  setTimeout(tick, Math.random()*400);
+}
+
+// hero mascot logo (medium, revealed once intro lands)
+document.getElementById('heroLogoSlot').appendChild(buildLogoFrame(200, true));
+
+// nav logo (small, revealed once intro lands)
+document.getElementById('navLogoSlot').appendChild(buildLogoFrame(62, true));
+
+// footer logo (static, no dissolve needed)
+document.getElementById('footerLogoSlot').appendChild(buildLogoFrame(56, false));
+
+// intro splash logo (big, animates from center to nav slot)
+const introFrame = buildLogoFrame(window.innerWidth<640?200:300, true);
+document.getElementById('introLogoWrap').appendChild(introFrame);
+
+window.addEventListener('load', ()=>{
+  setTimeout(()=>{
+    const intro = document.getElementById('introLogoWrap');
+    const slot = document.getElementById('navLogoSlot');
+    const overlay = document.getElementById('introOverlay');
+    const introRect = intro.getBoundingClientRect();
+    const slotRect = slot.getBoundingClientRect();
+    const dx = (slotRect.left + slotRect.width/2) - (introRect.left + introRect.width/2);
+    const dy = (slotRect.top + slotRect.height/2) - (introRect.top + introRect.height/2);
+    const scale = slotRect.width / introRect.width;
+    intro.style.transform = `translate(-50%,-50%) translate(${dx}px, ${dy}px) scale(${scale})`;
+    intro.classList.add('fly');
+    overlay.classList.add('hide');
+    setTimeout(()=>{
+      slot.classList.add('show');
+      document.getElementById('heroLogoSlot').classList.add('show');
+      overlay.style.display = 'none';
+    }, 950);
+  }, 1400); // big logo holds center for ~1.4s before shifting, per request
+});
+
+/* =========================================================
+   SITE CONTENT (stats, leadership, events, campus, moments)
+   Loaded from localStorage 'techtitan_site_data', edited via
+   the admin dashboard. Falls back to sensible defaults and
+   seeds localStorage on first load so the admin panel starts
+   from the same content shown here.
+   ========================================================= */
+const DEFAULT_SITE_DATA = {
+  stats: { members: 420, eventsDone: 12, upcoming: 2, ongoing: 0 },
+  leadership: [
+    { id:'ld1', photo:'https://picsum.photos/seed/hod-xyz/500/625', role:'HEAD OF DEPARTMENT', name:'Dr. Rajeev Malhotra', desc:"Oversees the CSE department and mentors Tech Titan's technical roadmap." },
+    { id:'ld2', photo:'https://picsum.photos/seed/director-xyz/500/625', role:'DIRECTOR', name:'Dr. Anjali Sharma', desc:'Leads the institute and champions student-run initiatives like Tech Titan.' },
+    { id:'ld3', photo:'https://picsum.photos/seed/clubhead-xyz/500/625', role:'CLUB HEAD', name:'Arjun Mehta', desc:'Final-year CSE student running day-to-day operations and the robotics vertical.' }
+  ],
+  events: [
+    { id:'ev1', tag:'FLAGSHIP · HACKATHON', title:'SIH Hackathon', desc:'Internal qualifier round for Smart India Hackathon — build a working prototype against a real problem statement in 24 hours.', date:'Oct 14–15', meta2:'Team of 6', meta3:'CSE Block', status:'upcoming', openForReg:true },
+    { id:'ev2', tag:'WORKSHOP', title:'Robotics Workshop', desc:'Hands-on session covering ROS basics and line-follower builds. Laptops and kits provided, no prior experience needed.', date:'Oct 22', meta2:'Solo entry', meta3:'Lab 204', status:'upcoming', openForReg:true }
+  ],
+  campus: [
+    { id:'cp1', photo:'campus3.jpg', caption:'AERIAL VIEW' },
+    { id:'cp2', photo:'campus2.jpg', caption:'MAIN GATE' },
+    { id:'cp3', photo:'campus1.jpg', caption:'ACADEMIC BLOCK' },
+    { id:'cp4', photo:'https://picsum.photos/seed/campus4/400/800', caption:'CAMPUS' },
+    { id:'cp5', photo:'https://picsum.photos/seed/campus5/400/400', caption:'CAMPUS' },
+    { id:'cp6', photo:'https://picsum.photos/seed/campus6/400/400', caption:'CAMPUS' }
+  ],
+  moments: [
+    { id:'mo1', photo:'https://picsum.photos/seed/moment1/500/400', title:'HackTitan 1.0 finals', date:'MAR 2026' },
+    { id:'mo2', photo:'https://picsum.photos/seed/moment2/500/400', title:'Robotics workshop', date:'JAN 2026' },
+    { id:'mo3', photo:'https://picsum.photos/seed/moment3/500/400', title:'Circuit design sprint', date:'NOV 2025' },
+    { id:'mo4', photo:'https://picsum.photos/seed/moment4/500/400', title:'Orientation day', date:'AUG 2025' },
+    { id:'mo5', photo:'https://picsum.photos/seed/moment5/500/400', title:'Line follower demo', date:'JUL 2025' },
+    { id:'mo6', photo:'https://picsum.photos/seed/moment6/500/400', title:'Guest lecture Q&A', date:'MAY 2025' }
+  ]
+};
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str==null ? '' : String(str);
+  return d.innerHTML;
+}
+
+// siteData starts as defaults, then stays in sync with Firestore in
+// real time — any change saved from admin.html appears here within
+// a second or two, on every visitor's browser, with no page reload.
+let siteData = JSON.parse(JSON.stringify(DEFAULT_SITE_DATA));
+
+function renderAll(){
+  renderStats();
+  renderLeadership();
+  renderEvents();
+  renderCampus();
+  renderMoments();
+}
+
+if(window.techtitanDb){
+  // Content lives in one Firestore document per section (siteContent/stats,
+  // siteContent/leadership, ...) so admin.html can grant edit access to each
+  // section independently. Each one is watched in real time.
+  const SECTION_KEYS = ['stats','leadership','events','campus','moments'];
+  SECTION_KEYS.forEach(key=>{
+    techtitanDb.collection('siteContent').doc(key).onSnapshot((doc)=>{
+      if(doc.exists){
+        siteData[key] = key==='stats' ? doc.data() : (doc.data().items || []);
+      } else {
+        // Not seeded yet for this section — fall back to the built-in default
+        // shown in every visitor's browser until an admin saves real content.
+        siteData[key] = JSON.parse(JSON.stringify(DEFAULT_SITE_DATA[key]));
+      }
+      renderAll();
+    }, (err)=>{
+      console.error('Live data unavailable for '+key+', showing defaults:', err);
+      renderAll();
+    });
+  });
+} else {
+  renderAll();
+}
+
+/* ---- stats ---- */
+function renderStats(){
+  const s = siteData.stats || DEFAULT_SITE_DATA.stats;
+  const cells = [
+    { count: s.members, label: 'MEMBERS' },
+    { count: s.eventsDone, label: 'EVENTS DONE' },
+    { count: s.upcoming, label: 'UPCOMING' },
+    { count: s.ongoing, label: 'ONGOING' }
+  ];
+  document.getElementById('stats').innerHTML = cells.map(c => `
+    <div class="readout-cell"><b data-count="${parseInt(c.count,10)||0}">0</b><span>${escapeHtml(c.label)}</span></div>
+  `).join('');
+}
+
+/* ---- leadership ---- */
+function renderLeadership(){
+  const list = siteData.leadership || [];
+  document.getElementById('leadershipGrid').innerHTML = list.map(p => `
+    <div class="tilt-card">
+      <div class="tilt-photo"><img src="${p.photo}" alt="${escapeHtml(p.name)}"></div>
+      <div class="tilt-body">
+        <div class="tilt-role">${escapeHtml(p.role)}</div>
+        <div class="tilt-name">${escapeHtml(p.name)}</div>
+        <div class="tilt-desc">${escapeHtml(p.desc)}</div>
+      </div>
+    </div>
+  `).join('');
+  attachTiltHandlers();
+}
+function attachTiltHandlers(){
+  document.querySelectorAll('.tilt-card').forEach(card=>{
+    card.addEventListener('mousemove', (e)=>{
+      const r = card.getBoundingClientRect();
+      const x = (e.clientX - r.left)/r.width - 0.5;
+      const y = (e.clientY - r.top)/r.height - 0.5;
+      card.style.transform = `perspective(700px) rotateY(${x*8}deg) rotateX(${-y*8}deg)`;
+    });
+    card.addEventListener('mouseleave', ()=>{ card.style.transform = 'perspective(700px) rotateY(0) rotateX(0)'; });
+  });
+}
+
+/* ---- events ---- */
+const STATUS_LABEL = { upcoming:'UPCOMING', ongoing:'ONGOING NOW', done:'COMPLETED' };
+function renderEvents(){
+  const list = siteData.events || [];
+  const grid = document.getElementById('eventsGrid');
+  if(!list.length){
+    grid.innerHTML = `<p style="color:var(--slate);font-family:var(--mono);font-size:13px;">No events listed right now — check back soon.</p>`;
+  } else {
+    grid.innerHTML = list.map((ev,i) => `
+      <div class="event-card">
+        <div class="event-tag-top">${escapeHtml(ev.tag)}${ev.status ? ' · ' + (STATUS_LABEL[ev.status]||'') : ''}</div>
+        <h4>${escapeHtml(ev.title)}</h4>
+        <p>${escapeHtml(ev.desc)}</p>
+        <div class="event-meta"><span><b>${escapeHtml(ev.date)}</b></span><span>${escapeHtml(ev.meta2)}</span><span>${escapeHtml(ev.meta3)}</span></div>
+        ${ev.openForReg ? `<button class="btn-small" data-reg-title="${escapeHtml(ev.title)}">Register</button>` : ''}
+      </div>
+    `).join('');
+    grid.querySelectorAll('[data-reg-title]').forEach(btn=>{
+      btn.addEventListener('click', ()=> openReg(btn.dataset.regTitle));
+    });
+  }
+  const openCount = list.filter(e=>e.openForReg).length;
+  const note = document.getElementById('eventsNote');
+  if(note) note.textContent = openCount ? `${openCount} event${openCount===1?'':'s'} open for registration right now. Pick one to get started.` : 'No events open for registration right now — check back soon.';
+  const ctaNote = document.getElementById('ctaNote');
+  if(ctaNote){
+    const openTitles = list.filter(e=>e.openForReg).map(e=>e.title);
+    ctaNote.textContent = openTitles.length
+      ? `${openTitles.join(' & ').toUpperCase()} ${openTitles.length===1?'IS':'ARE'} OPEN NOW · LIMITED SEATS`
+      : 'NEW EVENTS COMING SOON · STAY TUNED';
+  }
+}
+
+/* ---- campus gallery ---- */
+function renderCampus(){
+  const list = siteData.campus || [];
+  document.getElementById('campusMosaic').innerHTML = list.map(c => `
+    <a href="#"><img src="${c.photo}" alt="${escapeHtml(c.caption)}"><span class="cap">${escapeHtml(c.caption)}</span></a>
+  `).join('');
+}
+
+/* ---- moments ---- */
+function renderMoments(){
+  const list = siteData.moments || [];
+  const grid = document.getElementById('momentsGrid');
+  grid.innerHTML = list.length ? list.map(m => `
+    <div class="moment-card"><img src="${m.photo}" alt="${escapeHtml(m.title)}"><div class="moment-caption"><h5>${escapeHtml(m.title)}</h5><span>${escapeHtml(m.date)}</span></div></div>
+  `).join('') : `<p style="color:var(--slate);font-family:var(--mono);font-size:13px;">No moments added yet.</p>`;
+}
+
+/* ---------- scroll reveal ---------- */
+const revealEls = document.querySelectorAll('.reveal');
+const io = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+},{threshold:0.15});
+revealEls.forEach(el=>io.observe(el));
+
+/* ---------- count-up stats ---------- */
+const statsEl = document.getElementById('stats');
+let counted = false;
+const countIO = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting && !counted){
+      counted = true;
+      document.querySelectorAll('[data-count]').forEach(el=>{
+        const target = parseInt(el.dataset.count,10);
+        const dur = 1200; const start = performance.now();
+        function step(now){
+          const p = Math.min((now-start)/dur,1);
+          el.textContent = Math.floor(p*target);
+          if(p<1) requestAnimationFrame(step); else el.textContent = target;
+        }
+        requestAnimationFrame(step);
+      });
+    }
+  });
+},{threshold:0.4});
+if(statsEl) countIO.observe(statsEl);
+
+/* ---------- registration modal ---------- */
+let chosenEvent = null;
+function renderChoiceGrid(){
+  const list = (siteData.events || []).filter(e => e.openForReg);
+  const grid = document.getElementById('choiceGrid');
+  if(!list.length){
+    grid.innerHTML = `<p style="color:var(--slate);font-family:var(--mono);font-size:13px;grid-column:1/-1;">No events are open for registration right now.</p>`;
+    return;
+  }
+  grid.innerHTML = list.map(ev => `
+    <div class="choice-card" data-choice-title="${escapeHtml(ev.title)}">
+      <div class="choice-tag">${escapeHtml(ev.tag)}</div>
+      <h4>${escapeHtml(ev.title)}</h4>
+      <p>${escapeHtml(ev.desc)}</p>
+    </div>
+  `).join('');
+  grid.querySelectorAll('[data-choice-title]').forEach(card=>{
+    card.addEventListener('click', ()=> selectEvent(card.dataset.choiceTitle));
+  });
+}
+function openReg(preselect){
+  document.getElementById('regOverlay').classList.add('open');
+  document.getElementById('stepConfirm').classList.add('hidden');
+  if(preselect){ selectEvent(preselect); }
+  else{
+    chosenEvent = null;
+    renderChoiceGrid();
+    document.getElementById('stepChoice').classList.remove('hidden');
+    document.getElementById('stepForm').classList.add('hidden');
+    document.getElementById('modalTitle').textContent = 'Choose an event';
+  }
+}
+function closeReg(){
+  document.getElementById('regOverlay').classList.remove('open');
+  document.getElementById('regForm').reset();
+}
+function selectEvent(name){
+  chosenEvent = name;
+  document.getElementById('selectedEventLabel').textContent = name;
+  document.getElementById('modalTitle').textContent = 'Your details';
+  document.getElementById('stepChoice').classList.add('hidden');
+  document.getElementById('stepForm').classList.remove('hidden');
+  document.getElementById('stepConfirm').classList.add('hidden');
+}
+function backToChoice(){
+  document.getElementById('stepForm').classList.add('hidden');
+  document.getElementById('stepChoice').classList.remove('hidden');
+  document.getElementById('modalTitle').textContent = 'Choose an event';
+}
+function submitReg(e){
+  e.preventDefault();
+  const entry = {
+    event: chosenEvent,
+    name: document.getElementById('f-name').value.trim(),
+    roll: document.getElementById('f-roll').value.trim(),
+    class: document.getElementById('f-class').value.trim(),
+    semester: document.getElementById('f-sem').value,
+    section: document.getElementById('f-section').value.trim(),
+    contact: document.getElementById('f-contact').value.trim()
+  };
+  const btn = document.getElementById('regSubmitBtn');
+  if(!window.techtitanDb){
+    // No live database configured — still confirm locally so the form doesn't feel broken,
+    // but nothing is saved for the admin to see.
+    showRegConfirm();
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+  techtitanDb.collection('registrations').add(Object.assign({}, entry, {
+    submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+  })).then(()=>{
+    btn.disabled = false;
+    btn.textContent = 'Submit registration';
+    showRegConfirm();
+  }).catch(err=>{
+    btn.disabled = false;
+    btn.textContent = 'Submit registration';
+    alert('Could not submit your registration right now: ' + err.message);
+  });
+}
+function showRegConfirm(){
+  document.getElementById('stepForm').classList.add('hidden');
+  document.getElementById('stepConfirm').classList.remove('hidden');
+  document.getElementById('modalTitle').textContent = 'Registered';
+  document.getElementById('confirmText').textContent =
+    `You're registered for ${chosenEvent}. Confirmation details will be shared over email before the event.`;
+}
+document.getElementById('regOverlay').addEventListener('click', (e)=>{
+  if(e.target.id==='regOverlay') closeReg();
+});
+
+/* ---------- mobile menu ---------- */
+const navBurger = document.getElementById('navBurger');
+const mobileMenu = document.getElementById('mobileMenu');
+const mobileBackdrop = document.getElementById('mobileBackdrop');
+function closeMobileMenu(){
+  navBurger.classList.remove('open');
+  mobileMenu.classList.remove('open');
+  mobileBackdrop.classList.remove('open');
+}
+navBurger.addEventListener('click', ()=>{
+  const open = mobileMenu.classList.toggle('open');
+  navBurger.classList.toggle('open', open);
+  mobileBackdrop.classList.toggle('open', open);
+});
+mobileBackdrop.addEventListener('click', closeMobileMenu);
+mobileMenu.querySelectorAll('a').forEach(a=> a.addEventListener('click', closeMobileMenu));
+
+/* ---------- reduced motion ---------- */
+if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+  document.querySelectorAll('.reveal').forEach(el=>el.classList.add('in'));
+  document.getElementById('introOverlay').style.display='none';
+  document.getElementById('navLogoSlot').classList.add('show');
+  document.getElementById('heroLogoSlot').classList.add('show');
+}
+</script>
+
+</body>
+</html>
